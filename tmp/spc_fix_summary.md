@@ -1,15 +1,19 @@
-# SPC 曲頭ノイズ修正 — 経緯・原因・修正箇所まとめ
+# SPC / NSF / GBS 曲頭ノイズ・頭切れ修正 — 経緯・原因・修正箇所まとめ
 
 ---
 
 ## 問題の症状
 
-`gme_start_track()` → `gme_mute_voice()` × n → `gme_clear_blip_buffer()` の順で呼んだとき、  
-NSF・GBS は曲頭ノイズが出ないのに **SPC だけ** 「ブツッ」というノイズや「曲頭が削られている」感覚が出た。
+`gme_start_track()` → `gme_mute_voice()` × n → `gme_clear_blip_buffer()` の順で呼んだとき、
+
+- **SPC**：「ブツッ」というノイズや「曲頭が削られている（≈100ms）」感覚
+- **NSF・GBS**：曲頭がほんの少し（≈23ms）削られている
+
+いずれも同じ根本構造：`clear_blip_buffer()` が `buf_remain = 0` にして最初の音声チャンクを破棄し、次の `play()` が「既に進んだ位置」から再生を始める。
 
 ---
 
-## NSF・GBS と SPC の構造的な違い
+## NSF・GBS と SPC の構造的な違い（当初の認識）
 
 ### NSF・GBS（Classic_Emu + Blip_Buffer）
 
@@ -20,7 +24,7 @@ clear_buf_impl_() → buf->clear()
 - Blip_Buffer は「波形の変化点」を蓄積するバッファ
 - `clear()` を呼んでも **DSP は一切進まない**
 - 次の `play_()` はエミュレータの現在状態から即座に生成を再開
-- → クリア後も正確な位置から音が出る
+- → ただし `emu_time = buf_remain`（≈2048 サンプル）が残るため、**先頭 23ms が欠ける**
 
 ### SPC（Snes_Spc DSP + Fir_Resampler<24>）
 
@@ -178,10 +182,38 @@ void Spc_Emu::clear_buf_impl_()
 
 ---
 
-## NSF・GBS への影響
+---
 
-`clear_buf_impl_()` の override は `Classic_Emu`（NSF・GBS）と `Spc_Emu`（SPC）で別々に実装されている。  
-今回の変更は `Spc_Emu::clear_buf_impl_()` のみ。NSF・GBS は従来通り `buf->clear()` で動作し、影響なし。
+## NSF・GBS の頭切れ（後日判明）
+
+SPC 修正後、NSF でも「ほんの少し頭が削れている」ことが判明。
+
+### 原因
+
+`Music_Emu::start_track()` のサイレンス検出が最初の非無音チャンクを `buf[]`（2048 サンプル ≈ 23ms）に入れ、`emu_time = 2048` になる。  
+その後 `gme_clear_blip_buffer()` が `buf_remain = 0` にしてチャンクを破棄するが、`emu_time` は 2048 のまま残るため、次の `play()` が 2048 サンプル目から始まっていた。
+
+### NSF・GBS の修正（`Classic_Emu::clear_buf_impl_()`）
+
+SPC と同じアプローチ：エミュレータを再初期化してからサイレンス検出をやり直す。
+
+```cpp
+void Classic_Emu::clear_buf_impl_()
+{
+    if ( !buf ) return;
+    buf->clear();
+    if ( current_track() < 0 ) return;
+    // APU をリセット（last_amp = 0）→ DCジャンプ防止
+    int track = current_track();
+    remap_track_( &track );
+    if ( start_track_( track ) ) return;
+    remute_voices();               // ミュートを再適用
+    redo_silence_detection_();    // ミュート済みで冒頭チャンクを再生成
+}
+```
+
+- `start_track_()` で APU リセット → `last_amp = 0` → DC オフセットなし
+- `redo_silence_detection_()` で先頭から正しい音声チャンクを生成
 
 ---
 
@@ -189,4 +221,5 @@ void Spc_Emu::clear_buf_impl_()
 
 ```
 774dfa7  Fix SPC track-start cut by reloading DSP with muting before silence detection
+3278fc7  Fix NSF/GBS track-start cut by reinitializing emulator before silence detection
 ```
