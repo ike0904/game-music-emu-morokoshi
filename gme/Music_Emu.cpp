@@ -144,6 +144,36 @@ void Music_Emu::clear_blip_buffer()
 	clear_buf_impl_();
 }
 
+void Music_Emu::redo_silence_detection_()
+{
+	// Mirrors the silence-detection phase of start_track(), but without
+	// reloading or reinitialising the emulator (caller has done that).
+	buf_remain       = 0;
+	emu_time         = 0;
+	out_time         = 0;
+	out_time_scaled  = 0;
+	emu_track_ended_ = false;
+	track_ended_     = false;
+	silence_time     = 0;
+	silence_count    = 0;
+
+	if ( !ignore_silence_ )
+	{
+		for ( long end = max_initial_silence * out_channels() * sample_rate(); emu_time < end; )
+		{
+			fill_buf();
+			if ( buf_remain | (int) emu_track_ended_ )
+				break;
+		}
+
+		emu_time        = buf_remain;
+		out_time        = 0;
+		out_time_scaled = 0;
+		silence_time    = 0;
+		silence_count   = 0;
+	}
+}
+
 void Music_Emu::disable_echo( bool disable )
 {
 	disable_echo_( disable );

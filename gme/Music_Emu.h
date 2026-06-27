@@ -166,6 +166,8 @@ protected:
 	virtual blargg_err_t start_track_( int ); // tempo is set before this
 	virtual blargg_err_t play_( long count, sample_t* out ) = 0;
 	virtual blargg_err_t skip_( long count );
+	int mute_mask() const { return mute_mask_; }
+	void redo_silence_detection_();
 protected:
 	virtual void unload();
 	virtual void pre_load();

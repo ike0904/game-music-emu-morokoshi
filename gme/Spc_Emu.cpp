@@ -287,13 +287,18 @@ void Spc_Emu::mute_voices_( int m )
 
 void Spc_Emu::clear_buf_impl_()
 {
+	// Reload the SPC from scratch with muting already applied, then redo
+	// silence detection.  Simply calling resampler.clear() would cause the
+	// next play_() to fill the resampler starting from the current DSP
+	// position (~100ms ahead), producing a perceived cut at the track start.
+	if ( apu.load_spc( file_data, file_size ) ) return;
+	filter.set_gain( (int) (gain() * SPC_Filter::gain_unit) );
+	apu.clear_echo();
+	apu.set_tempo( (int) (tempo() * apu.tempo_unit) );
+	apu.mute_voices( mute_mask() );
 	resampler.clear();
 	filter.clear();
-	// Prime the resampler and filter with 64 discarded output samples to
-	// eliminate the FIR cold-start pop. Same technique as skip_().
-	const int resampler_latency = 64;
-	sample_t warmup [resampler_latency];
-	(void) play_( resampler_latency, warmup );
+	redo_silence_detection_();
 }
 
 void Spc_Emu::disable_echo_( bool disable )
