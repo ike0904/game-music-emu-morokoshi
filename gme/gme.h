@@ -187,6 +187,10 @@ BLARGG_EXPORT void gme_mute_voice( Music_Emu*, int index, int mute );
 voices, 0 unmutes them all, 0x01 mutes just the first voice, etc. */
 BLARGG_EXPORT void gme_mute_voices( Music_Emu*, int muting_mask );
 
+/* Discard buffered audio generated before muting was applied (e.g. during INIT).
+   Call after gme_start_track() and gme_mute_voice() to remove startup noise. */
+BLARGG_EXPORT void gme_clear_blip_buffer( Music_Emu* );
+
 /* Disable/Enable echo effect for SPC files */
 /* Available since 0.6.4 */
 BLARGG_EXPORT void gme_disable_echo( Music_Emu*, int disable );

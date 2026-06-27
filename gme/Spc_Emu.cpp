@@ -285,6 +285,12 @@ void Spc_Emu::mute_voices_( int m )
 	apu.mute_voices( m );
 }
 
+void Spc_Emu::clear_buf_impl_()
+{
+	resampler.clear();
+	filter.clear();
+}
+
 void Spc_Emu::disable_echo_( bool disable )
 {
 	apu.disable_echo( disable );

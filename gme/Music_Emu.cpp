@@ -138,6 +138,12 @@ void Music_Emu::mute_voices( int mask )
 	mute_voices_( mask );
 }
 
+void Music_Emu::clear_blip_buffer()
+{
+	buf_remain = 0;
+	clear_buf_impl_();
+}
+
 void Music_Emu::disable_echo( bool disable )
 {
 	disable_echo_( disable );

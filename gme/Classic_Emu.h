@@ -31,6 +31,7 @@ protected:
 protected:
 	blargg_err_t set_sample_rate_( long sample_rate ) override;
 	void mute_voices_( int ) override;
+	void clear_buf_impl_() override;
 	void set_equalizer_( equalizer_t const& ) override;
 	blargg_err_t play_( long, sample_t* ) override;
 private:

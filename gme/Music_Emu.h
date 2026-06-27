@@ -100,6 +100,10 @@ public:
 	// 0 unmutes them all, 0x01 mutes just the first voice, etc.
 	void mute_voices( int mask );
 
+	// Discard buffered audio generated before muting was applied (e.g. during INIT).
+	// Call after gme_start_track() and gme_mute_voice() to remove startup noise.
+	void clear_blip_buffer();
+
 	// Disables echo effect at SPC files
 	void disable_echo( bool disable );
 
@@ -156,6 +160,7 @@ protected:
 	virtual void set_equalizer_( equalizer_t const& ) { }
 	virtual void enable_accuracy_( bool /* enable */ ) { }
 	virtual void mute_voices_( int mask );
+	virtual void clear_buf_impl_() { }
 	virtual void disable_echo_( bool /* disable */);
 	virtual void set_tempo_( double );
 	virtual blargg_err_t start_track_( int ); // tempo is set before this

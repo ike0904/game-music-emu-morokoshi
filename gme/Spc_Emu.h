@@ -65,6 +65,7 @@ protected:
 	blargg_err_t play_( long, sample_t* );
 	blargg_err_t skip_( long );
 	void mute_voices_( int );
+	void clear_buf_impl_() override;
 	void disable_echo_( bool disable );
 	void set_tempo_( double );
 	void enable_accuracy_( bool );

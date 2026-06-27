@@ -79,6 +79,12 @@ void Classic_Emu::mute_voices_( int mask )
 	}
 }
 
+void Classic_Emu::clear_buf_impl_()
+{
+	if ( buf )
+		buf->clear();
+}
+
 void Classic_Emu::change_clock_rate( uint32_t rate )
 {
 	clock_rate_ = rate;
