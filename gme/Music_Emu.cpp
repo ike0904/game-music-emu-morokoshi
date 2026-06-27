@@ -134,8 +134,14 @@ void Music_Emu::mute_voice( int index, bool mute )
 void Music_Emu::mute_voices( int mask )
 {
 	require( sample_rate() ); // sample rate must be set first
+	bool changed = (mask != mute_mask_);
 	mute_mask_ = mask;
 	mute_voices_( mask );
+	// Discard pre-generated audio that used the old muting to avoid a brief
+	// flash of all channels when switching channel configuration mid-playback.
+	// Only clear when the mask actually changes and a track is active.
+	if ( changed && current_track_ >= 0 )
+		clear_blip_buffer();
 }
 
 void Music_Emu::clear_blip_buffer()

@@ -288,7 +288,8 @@ void Spc_Emu::mute_voices_( int m )
 void Spc_Emu::clear_buf_impl_()
 {
 	resampler.clear();
-	filter.clear();
+	// filter is intentionally not cleared: it was warmed up during silence
+	// detection and clearing it here causes a cold-start pop/click
 }
 
 void Spc_Emu::disable_echo_( bool disable )
