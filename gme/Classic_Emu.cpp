@@ -81,8 +81,17 @@ void Classic_Emu::mute_voices_( int mask )
 
 void Classic_Emu::clear_buf_impl_()
 {
-	if ( buf )
-		buf->clear();
+	if ( !buf ) return;
+	buf->clear();
+	if ( current_track() < 0 ) return;
+	// Re-run start_track_() to reset APU state (clears last_amp to 0),
+	// preventing a DC offset when redo_silence_detection_() re-generates
+	// the initial audio chunk with the current mute mask.
+	int track = current_track();
+	remap_track_( &track );
+	if ( start_track_( track ) ) return;
+	remute_voices();
+	redo_silence_detection_();
 }
 
 void Classic_Emu::change_clock_rate( uint32_t rate )
