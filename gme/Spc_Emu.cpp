@@ -288,8 +288,12 @@ void Spc_Emu::mute_voices_( int m )
 void Spc_Emu::clear_buf_impl_()
 {
 	resampler.clear();
-	// filter is intentionally not cleared: it was warmed up during silence
-	// detection and clearing it here causes a cold-start pop/click
+	filter.clear();
+	// Prime the resampler and filter with 64 discarded output samples to
+	// eliminate the FIR cold-start pop. Same technique as skip_().
+	const int resampler_latency = 64;
+	sample_t warmup [resampler_latency];
+	(void) play_( resampler_latency, warmup );
 }
 
 void Spc_Emu::disable_echo_( bool disable )
