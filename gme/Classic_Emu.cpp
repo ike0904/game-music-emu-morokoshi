@@ -92,6 +92,7 @@ void Classic_Emu::clear_buf_impl_()
 	if ( start_track_( track ) ) return;
 	remute_voices();
 	before_silence_detection_();
+	buf->clear(); // discard any PLAY audio left in Multi_Buffer by the burn loop
 	redo_silence_detection_();
 }
 
