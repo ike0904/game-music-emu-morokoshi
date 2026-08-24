@@ -615,6 +615,35 @@ blargg_err_t Nsf_Emu::start_track_( int track )
 	return 0;
 }
 
+void Nsf_Emu::before_silence_detection_()
+{
+	// Burn INIT frames with all channels muted so INIT noise is discarded.
+	// Then write silence values to APU registers so that INIT state (e.g. an
+	// active Pulse 2 length counter) does not contaminate redo_silence_detection_().
+	// The PLAY routine will overwrite these values when it activates channels.
+
+	int saved_mask = mute_mask();
+	mute_voices( ~0 ); // mute all channels during INIT burn
+
+	{
+		// Each play_() call covers ~50ms. INIT takes 4 PLAY periods (~67ms at 60fps).
+		// 2 iterations (100ms) is sufficient; loop up to 4 times as a safety margin.
+		enum { BURN = 4096 };
+		sample_t burn_buf [BURN];
+		for ( int i = 0; i < 4 && play_ready > 0 && !track_ended(); ++i )
+			play_( BURN, burn_buf );
+	}
+
+	// Silence all standard APU oscillators at the start of the next frame (time=0).
+	// Constant vol=0 silences Pulse/Noise; halting the linear counter silences Triangle.
+	apu.write_register( 0, 0x4000, 0x10 ); // Pulse 1: constant vol=0
+	apu.write_register( 0, 0x4004, 0x10 ); // Pulse 2: constant vol=0
+	apu.write_register( 0, 0x4008, 0x80 ); // Triangle: halt linear counter, load=0
+	apu.write_register( 0, 0x400C, 0x10 ); // Noise: constant vol=0
+
+	mute_voices( saved_mask ); // restore original mute mask for silence detection
+}
+
 blargg_err_t Nsf_Emu::run_clocks( blip_time_t& duration, int )
 {
 	set_time( 0 );

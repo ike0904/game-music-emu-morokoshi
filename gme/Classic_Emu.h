@@ -28,6 +28,10 @@ protected:
 	virtual void update_eq( blip_eq_t const& ) = 0;
 	virtual blargg_err_t start_track_( int track ) override;
 	virtual blargg_err_t run_clocks( blip_time_t& time_io, int msec ) = 0;
+	// Called between remute_voices() and redo_silence_detection_() in clear_buf_impl_().
+	// Override to burn INIT frames and silence APU state so that
+	// redo_silence_detection_() finds the real start of music, not INIT noise.
+	virtual void before_silence_detection_() {}
 protected:
 	blargg_err_t set_sample_rate_( long sample_rate ) override;
 	void mute_voices_( int ) override;

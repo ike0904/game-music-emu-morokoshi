@@ -91,6 +91,7 @@ void Classic_Emu::clear_buf_impl_()
 	remap_track_( &track );
 	if ( start_track_( track ) ) return;
 	remute_voices();
+	before_silence_detection_();
 	redo_silence_detection_();
 }
 

@@ -166,11 +166,12 @@ void Music_Emu::redo_silence_detection_()
 				break;
 		}
 
-		emu_time        = buf_remain;
+		// Preserve emu_time and silence_count so that head silence accumulated
+		// before the first non-silent chunk is included in playback output.
+		// This ensures clear_blip_buffer() does not cut the song's initial silence.
 		out_time        = 0;
 		out_time_scaled = 0;
 		silence_time    = 0;
-		silence_count   = 0;
 	}
 }
 
