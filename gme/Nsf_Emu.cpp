@@ -59,6 +59,7 @@ Nsf_Emu::Nsf_Emu()
 	fds   = 0;
 	mmc5  = 0;
 	vrc7  = 0;
+	use_fds_wram = false;
 
 	set_type( gme_nsf_type );
 	set_silence_lookahead( 6 );
@@ -94,6 +95,7 @@ void Nsf_Emu::unload()
 	}
 	#endif
 
+	use_fds_wram = false;
 	rom.clear();
 	Music_Emu::unload();
 }
@@ -275,6 +277,7 @@ blargg_err_t Nsf_Emu::init_sound()
 		{
 			fds = BLARGG_NEW Nes_Fds_Apu;
 			CHECK_ALLOC( fds );
+			use_fds_wram = true; // FDS NSFs can write to bankswitched ROM pages
 			adjusted_gain *= 0.75;
 
 			apu_names[count + 0] = "Wave";
@@ -573,6 +576,8 @@ blargg_err_t Nsf_Emu::start_track_( int track )
 
 	memset( low_mem, 0, sizeof low_mem );
 	memset( sram,    0, sizeof sram );
+	if ( use_fds_wram )
+		memset( fds_wram, 0, sizeof fds_wram );
 
 	cpu::reset( unmapped_code ); // also maps low_mem
 	cpu::map_code( sram_addr, sizeof sram, sram );

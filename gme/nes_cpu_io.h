@@ -85,7 +85,25 @@ void Nsf_Emu::cpu_write( nes_addr_t addr, int data )
 		int32_t offset = rom.mask_addr( data * (int32_t) bank_size );
 		if ( offset >= rom.size() )
 			set_warning( "Invalid bank" );
-		cpu::map_code( (bank + 8) * bank_size, bank_size, rom.at_addr( offset ) );
+		nes_addr_t cpu_addr = (bank + 8) * bank_size;
+		if ( use_fds_wram && cpu_addr >= fds_wram_start && cpu_addr < fds_wram_end )
+		{
+			// FDS NSF: copy ROM bank into writable buffer so PLAY can store state there
+			int woff = (int)cpu_addr - (int)fds_wram_start;
+			memcpy( fds_wram + woff, rom.at_addr( offset ), bank_size );
+			cpu::map_code( cpu_addr, bank_size, (void const*)(fds_wram + woff) );
+		}
+		else
+		{
+			cpu::map_code( cpu_addr, bank_size, rom.at_addr( offset ) );
+		}
+		return;
+	}
+
+	// FDS NSF: intercept writes to $8000-$DFFF (bankswitched ROM area) as RAM
+	if ( use_fds_wram && addr >= fds_wram_start && addr < fds_wram_end )
+	{
+		fds_wram[addr - fds_wram_start] = (byte)data;
 		return;
 	}
 
