@@ -631,12 +631,16 @@ void Nsf_Emu::before_silence_detection_()
 	mute_voices( ~0 ); // mute all channels during INIT burn
 
 	{
-		// Each play_() call covers ~50ms. INIT takes 4 PLAY periods (~67ms at 60fps).
-		// 2 iterations (100ms) is sufficient; loop up to 4 times as a safety margin.
-		enum { BURN = 4096 };
-		sample_t burn_buf [BURN];
-		for ( int i = 0; i < 4 && play_ready > 0 && !track_ended(); ++i )
-			play_( BURN, burn_buf );
+		// Burn the INIT period only: play_ready starts at 4 and decrements once per
+		// timer fire (~16.7ms at 60fps). Stop when play_ready reaches 1 (one fire
+		// before the first PLAY). This preserves the first PLAY frame's music in
+		// redo_silence_detection_() instead of burning it here.
+		// The old approach (4 iterations of 4096 samples) always burned ~184ms because
+		// play_ready resets to 1 after each PLAY, so the guard never fired.
+		enum { CHUNK = 64 };
+		sample_t burn_buf [CHUNK];
+		while ( play_ready > 1 && !track_ended() )
+			play_( CHUNK, burn_buf );
 	}
 
 	// Silence all standard APU oscillators at the start of the next frame (time=0).

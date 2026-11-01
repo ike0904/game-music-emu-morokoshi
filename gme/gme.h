@@ -191,6 +191,11 @@ BLARGG_EXPORT void gme_mute_voices( Music_Emu*, int muting_mask );
    Call after gme_start_track() and gme_mute_voice() to remove startup noise. */
 BLARGG_EXPORT void gme_clear_blip_buffer( Music_Emu* );
 
+/* Regenerate the audio that gme_start_track() already buffered, using the current
+   mute mask, without changing timing. Call after gme_start_track() and
+   gme_mute_voice(), before gme_play(). (morokoshi) */
+BLARGG_EXPORT void gme_refresh_lookahead( Music_Emu* );
+
 /* Disable/Enable echo effect for SPC files */
 /* Available since 0.6.4 */
 BLARGG_EXPORT void gme_disable_echo( Music_Emu*, int disable );

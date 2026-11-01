@@ -43,6 +43,7 @@ void Music_Emu::clear_track_vars()
 	silence_time     = 0;
 	silence_count    = 0;
 	buf_remain       = 0;
+	start_chunks     = 0;
 	warning(); // clear warning
 }
 
@@ -144,6 +145,29 @@ void Music_Emu::clear_blip_buffer()
 	clear_buf_impl_();
 }
 
+void Music_Emu::refresh_lookahead()
+{
+	// start_track() ran its silence detection with whatever mute mask was set then
+	// (normally none), so the lookahead buffer contains every voice. Re-run the track
+	// from the start with the current mask and the same number of chunks, then replace
+	// the lookahead. Timing stays identical to start_track().
+	if ( current_track_ < 0 || out_time != 0 || buf_remain != buf_size || start_chunks < 1 )
+		return;
+	int track = current_track_;
+	if ( remap_track_( &track ) || start_track_( track ) )
+		return;
+	remute_voices();
+	for ( long i = 0; i < start_chunks; ++i )
+	{
+		blargg_err_t err = play_( buf_size, buf.begin() );
+		if ( err )
+		{
+			end_track_if_error( err );
+			return;
+		}
+	}
+}
+
 void Music_Emu::redo_silence_detection_()
 {
 	// Mirrors the silence-detection phase of start_track(), but without
@@ -159,19 +183,39 @@ void Music_Emu::redo_silence_detection_()
 
 	if ( !ignore_silence_ )
 	{
-		for ( long end = max_initial_silence * out_channels() * sample_rate(); emu_time < end; )
+		// Scale the search window by tempo reciprocal so slow tempos (e.g. 1/8x) don't
+		// time out before the first note: at 1/8x, 2 musical seconds = 16 audio seconds.
+		double t = (tempo_ > 0.0) ? tempo_ : 1.0;
+		long end = (long)(max_initial_silence / t * out_channels() * sample_rate());
+		// Cap at 30 audio seconds to avoid runaway loops at extreme tempos
+		long cap = (long)(30.0 * out_channels() * sample_rate());
+		if ( end > cap ) end = cap;
+		for ( ; emu_time < end; )
 		{
 			fill_buf();
 			if ( buf_remain | (int) emu_track_ended_ )
 				break;
 		}
 
+		// If timed out without finding audio, reset silence_count and anchor
+		// silence_time to the current emu_time so the silence_max guard in
+		// play() doesn't misfire immediately (emu_time - silence_time stays
+		// near 0 at first). Head silence will be cut, but music will play.
+		if ( !buf_remain && !emu_track_ended_ )
+		{
+			silence_count = 0;
+			silence_time  = emu_time;
+		}
+
 		// Preserve emu_time and silence_count so that head silence accumulated
 		// before the first non-silent chunk is included in playback output.
 		// This ensures clear_blip_buffer() does not cut the song's initial silence.
+		// silence_time is intentionally NOT reset here: fill_buf() set it to where
+		// the first non-silent audio was found, so play()'s silence_max guard works
+		// correctly. Resetting it to 0 would make (emu_time - silence_time) large
+		// and trigger a false track-ended for channels with a long head silence.
 		out_time        = 0;
 		out_time_scaled = 0;
-		silence_time    = 0;
 	}
 }
 
@@ -214,6 +258,8 @@ blargg_err_t Music_Emu::start_track( int track )
 		// play until non-silence or end of track
 		for ( long end = max_initial_silence * out_channels() * sample_rate(); emu_time < end; )
 		{
+			if ( !emu_track_ended_ )
+				start_chunks++;
 			fill_buf();
 			if ( buf_remain | (int) emu_track_ended_ )
 				break;
@@ -460,12 +506,6 @@ blargg_err_t Music_Emu::play( long out_count, sample_t* out )
 			memset( out, 0, pos * sizeof *out );
 			silence_count -= pos;
 
-			if ( !ignore_silence_ && emu_time - silence_time > silence_max * out_channels() * sample_rate() )
-			{
-				track_ended_  = emu_track_ended_ = true;
-				silence_count = 0;
-				buf_remain    = 0;
-			}
 		}
 
 		if ( buf_remain )

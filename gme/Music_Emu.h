@@ -104,6 +104,11 @@ public:
 	// Call after gme_start_track() and gme_mute_voice() to remove startup noise.
 	void clear_blip_buffer();
 
+	// Regenerate the start_track() lookahead with the current mute mask, keeping
+	// the exact timing of start_track() (silence detection is not redone).
+	// Call right after gme_start_track() + gme_mute_voice(), before gme_play().
+	void refresh_lookahead();
+
 	// Disables echo effect at SPC files
 	void disable_echo( bool disable );
 
@@ -211,6 +216,7 @@ private:
 	long silence_time;     // number of samples where most recent silence began
 	long silence_count;    // number of samples of silence to play before using buf
 	long buf_remain;       // number of samples left in silence buffer
+	long start_chunks;     // emu_play() calls made by start_track() silence detection
 	enum { buf_size = 2048 };
 	blargg_vector<sample_t> buf;
 	void fill_buf();
