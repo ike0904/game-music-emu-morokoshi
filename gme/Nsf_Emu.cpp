@@ -583,6 +583,15 @@ blargg_err_t Nsf_Emu::start_track_( int track )
 	cpu::map_code( sram_addr, sizeof sram, sram );
 	for ( int i = 0; i < bank_count; ++i )
 		cpu_write( bank_select_addr + i, initial_banks [i] );
+	bool bankswitched = false;
+	for ( int i = 0; i < bank_count; ++i )
+		bankswitched |= header_.banks [i] != 0;
+	if ( use_fds_wram && bankswitched )
+	{
+		// FDS NSF spec: $6000/$7000 start with the $E000/$F000 bank values (header $76/$77)
+		cpu_write( fds_bank_select_addr + 0, initial_banks [6] );
+		cpu_write( fds_bank_select_addr + 1, initial_banks [7] );
+	}
 
 	apu.reset( pal_only, (header_.speed_flags & 0x20) ? 0x3F : 0 );
 	apu.write_register( 0, 0x4015, 0x0F );

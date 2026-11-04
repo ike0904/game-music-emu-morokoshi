@@ -107,10 +107,12 @@ private:
 
 	enum { sram_addr = 0x6000 };
 	byte sram [0x2000];
-	// FDS NSFs use working variables in bankswitched ROM area ($8000-$DFFF).
-	// This writable buffer lets PLAY read back values it wrote there.
-	enum { fds_wram_start = 0x8000, fds_wram_end = 0xE000,
-	       fds_wram_size  = fds_wram_end - fds_wram_start }; // 24KB
+	// FDS NSFs use working variables in bankswitched ROM area ($8000-$FFFF;
+	// the FDS has RAM at $6000-$FFFF). This writable buffer lets PLAY read back values it wrote there.
+	enum { fds_wram_start = 0x8000, fds_wram_end = 0x10000,
+	       fds_wram_size  = fds_wram_end - fds_wram_start }; // 32KB
+	// FDS NSF: $5FF6/$5FF7 switch 4KB banks into $6000/$7000 (copied into sram)
+	enum { fds_bank_select_addr = 0x5FF6 };
 	byte fds_wram [fds_wram_size];
 	bool use_fds_wram; // true for FDS expansion NSFs
 	byte unmapped_code [Nes_Cpu::page_size + 8];

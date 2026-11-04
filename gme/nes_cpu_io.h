@@ -79,6 +79,16 @@ void Nsf_Emu::cpu_write( nes_addr_t addr, int data )
 		return;
 	}
 
+	// FDS NSF: $5FF6/$5FF7 copy a ROM bank into the RAM at $6000/$7000
+	if ( use_fds_wram && (unsigned) (addr - fds_bank_select_addr) < 2 )
+	{
+		int32_t offset = rom.mask_addr( data * (int32_t) bank_size );
+		if ( offset >= rom.size() )
+			set_warning( "Invalid bank" );
+		memcpy( sram + (addr - fds_bank_select_addr) * bank_size, rom.at_addr( offset ), bank_size );
+		return;
+	}
+
 	unsigned bank = addr - bank_select_addr;
 	if ( bank < bank_count )
 	{
@@ -100,7 +110,7 @@ void Nsf_Emu::cpu_write( nes_addr_t addr, int data )
 		return;
 	}
 
-	// FDS NSF: intercept writes to $8000-$DFFF (bankswitched ROM area) as RAM
+	// FDS NSF: intercept writes to $8000-$FFFF (bankswitched ROM area) as RAM
 	if ( use_fds_wram && addr >= fds_wram_start && addr < fds_wram_end )
 	{
 		fds_wram[addr - fds_wram_start] = (byte)data;
