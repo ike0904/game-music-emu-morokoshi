@@ -355,7 +355,9 @@ blargg_err_t Nsf_Emu::load_( Data_Reader& in )
 	if ( !load_addr ) load_addr = rom_begin;
 	if ( !init_addr ) init_addr = rom_begin;
 	if ( !play_addr ) play_addr = rom_begin;
-	if ( load_addr < rom_begin || init_addr < rom_begin )
+	// FDS NSF: $6000-$7FFF is RAM that the tune may load into and run from
+	nes_addr_t const min_addr = use_fds_wram ? (nes_addr_t) sram_addr : (nes_addr_t) rom_begin;
+	if ( load_addr < min_addr || init_addr < min_addr )
 	{
 		const char* w = warning();
 		if ( !w )
@@ -367,20 +369,31 @@ blargg_err_t Nsf_Emu::load_( Data_Reader& in )
 	int total_banks = rom.size() / bank_size;
 
 	// bank switching
-	int first_bank = (load_addr - rom_begin) / bank_size;
+	int first_bank = ((int) load_addr - rom_begin) / bank_size;
+	if ( (int) load_addr < rom_begin )
+		first_bank = -(int) ((rom_begin - load_addr + bank_size - 1) / bank_size);
+	bool bankswitched = false;
+	for ( int i = 0; i < bank_count; i++ )
+		bankswitched |= header_.banks [i] != 0;
 	for ( int i = 0; i < bank_count; i++ )
 	{
 		unsigned bank = i - first_bank;
 		if ( bank >= (unsigned) total_banks )
 			bank = 0;
 		initial_banks [i] = bank;
+	}
+	if ( bankswitched )
+		memcpy( initial_banks, header_.banks, sizeof initial_banks );
 
-		if ( header_.banks [i] )
-		{
-			// bank-switched
-			memcpy( initial_banks, header_.banks, sizeof initial_banks );
-			break;
-		}
+	// FDS NSF: initial contents of $6000/$7000 (-1 = empty RAM)
+	for ( int i = 0; i < 2; i++ )
+	{
+		int bank = i - 2 - first_bank; // slot $6000 + i * $1000
+		if ( bankswitched )
+			bank = header_.banks [6 + i]; // NSF spec: same as $E000/$F000 (header $76/$77)
+		else if ( bank < 0 || bank >= total_banks )
+			bank = -1;
+		fds_low_banks [i] = bank;
 	}
 
 	pal_only = (header_.speed_flags & 3) == 1;
@@ -583,14 +596,12 @@ blargg_err_t Nsf_Emu::start_track_( int track )
 	cpu::map_code( sram_addr, sizeof sram, sram );
 	for ( int i = 0; i < bank_count; ++i )
 		cpu_write( bank_select_addr + i, initial_banks [i] );
-	bool bankswitched = false;
-	for ( int i = 0; i < bank_count; ++i )
-		bankswitched |= header_.banks [i] != 0;
-	if ( use_fds_wram && bankswitched )
+	if ( use_fds_wram )
 	{
-		// FDS NSF spec: $6000/$7000 start with the $E000/$F000 bank values (header $76/$77)
-		cpu_write( fds_bank_select_addr + 0, initial_banks [6] );
-		cpu_write( fds_bank_select_addr + 1, initial_banks [7] );
+		// FDS NSF: $6000/$7000 start with the tune data (or header $76/$77 banks)
+		for ( int i = 0; i < 2; ++i )
+			if ( fds_low_banks [i] >= 0 )
+				cpu_write( fds_bank_select_addr + i, fds_low_banks [i] );
 	}
 
 	apu.reset( pal_only, (header_.speed_flags & 0x20) ? 0x3F : 0 );
@@ -614,7 +625,9 @@ blargg_err_t Nsf_Emu::start_track_( int track )
 	}
 	#endif
 
-	play_ready = 4;
+	// PLAY interrupts an INIT that has not returned after this many frames.
+	// FDS NSFs may copy their program into RAM in INIT for longer than 4 frames.
+	play_ready = use_fds_wram ? 60 : 4;
 	play_extra = 0;
 	next_play = play_period / clock_divisor;
 

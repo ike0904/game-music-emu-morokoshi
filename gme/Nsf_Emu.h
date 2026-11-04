@@ -113,6 +113,7 @@ private:
 	       fds_wram_size  = fds_wram_end - fds_wram_start }; // 32KB
 	// FDS NSF: $5FF6/$5FF7 switch 4KB banks into $6000/$7000 (copied into sram)
 	enum { fds_bank_select_addr = 0x5FF6 };
+	int fds_low_banks [2]; // initial banks at $6000/$7000, -1 = empty RAM
 	byte fds_wram [fds_wram_size];
 	bool use_fds_wram; // true for FDS expansion NSFs
 	byte unmapped_code [Nes_Cpu::page_size + 8];
